@@ -9,5 +9,7 @@ Já o segundo trecho expõe que a engenharia de software não é só o ato de es
 ## 🟢 Tradeoffs
 
 ⦁	Performance vs Manutenibilidade: Melhorar muito a performance geralmente exige otimizações complexas, que podem deixar o código mais difícil de entender e manter.
+
 ⦁	Tempo de Desenvolvimento vs Qualidade: Entregar rápido pode significar abrir mão de testes completos, documentação ou boas práticas de arquitetura.
+
 ⦁	Segurança vs. Usabilidade: Mais segurança muitas vezes significa mais barreiras para o usuário, reduzindo a facilidade de uso.
