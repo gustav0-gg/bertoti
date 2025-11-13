@@ -25,17 +25,6 @@ Já o segundo trecho expõe que a engenharia de software não é só o ato de es
 ## 🟢 Testes Automatizados
 <img width="500" height="250" alt="image" src="https://github.com/user-attachments/assets/f93240a1-90da-486d-9e29-2184fd955e67" />
 
-## 🟣 Segundo Trecho
-Já o segundo trecho expõe que a engenharia de software não é só o ato de escrever códigos, mas sim as ferramentas necessárias para construir e manter um código adaptável através da extensão de sua vida útil, e em sua evolução de tamanho.
-
-## 🟢 Tradeoffs
-
-⦁	Performance vs Manutenibilidade: Melhorar muito a performance geralmente exige otimizações complexas, que podem deixar o código mais difícil de entender e manter.
-
-⦁	Tempo de Desenvolvimento vs Qualidade: Entregar rápido pode significar abrir mão de testes completos, documentação ou boas práticas de arquitetura.
-
-⦁	Segurança vs. Usabilidade: Mais segurança muitas vezes significa mais barreiras para o usuário, reduzindo a facilidade de uso.
-
 ## 🟡 2º Diagrama de Classes UML
 <img width="750" height="550" alt="Universidade" src="https://github.com/user-attachments/assets/41d6d437-c3b5-4692-befd-be03480492b2" />
 
