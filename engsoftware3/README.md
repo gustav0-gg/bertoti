@@ -2,7 +2,85 @@
 
 ---
 
-## 1. Contribuições da Atividade de Engenharia de Software III
+## 1. Contribuições da Atividade de Engenharia de Software III (IAbertoti)
+
+> **Repositório do Projeto:** [TeamMinerva/IAbertoti](https://github.com/TeamMinerva/IAbertoti)  
+> **Objetivo:** Desenvolvimento de um *Knowledge Assistant* (Assistente de Conhecimento RAG) com **Spring AI** e **Ollama** aplicando e fundamentando defensavelmente **5 Design Patterns do GoF** (State, Command, Strategy, Observer e Composite), interface web Thymeleaf, suíte completa de testes e documentação formal com diagramas UML.
+
+#### 1. Configuração da Infraestrutura de IA com Spring AI e Ollama (`1d07b5e`)
+- **Atualização do Ecossistema Spring Boot e Dependências:**
+  - Atualização do Spring Boot para a versão `3.4.2` com Java 21 no `pom.xml` e inclusão do Bill of Materials (BOM) do **Spring AI** (`spring-ai-bom` na versão `1.0.0-M6`).
+  - Adição do starter `spring-ai-ollama` para comunicação nativa com modelos de linguagem open-source rodando localmente via Ollama.
+  - Parametrização do endpoint local e seleção de modelo no `src/main/resources/application.properties` (`spring.ai.ollama.base-url=http://localhost:11434`, modelo padrão configurável `llama3.2` ou `qwen2.5:7b`).
+- **Bean Central de Inferência:**
+  - Criação da classe de configuração `@Configuration` `SpringAiConfig` (`br.com.minerva.iabertoti.config.SpringAiConfig`), expondo o bean gerenciado `ChatClient` construído via `ChatClient.Builder`.
+
+#### 2. Serviço de Base de Conhecimento e Pipeline RAG em Memória (`1d07b5e`)
+- **Modelagem de Documento:**
+  - Criação do record imutável `DocumentoConhecimento` (`br.com.minerva.iabertoti.model.DocumentoConhecimento`), encapsulando nome do arquivo, tipo MIME, data/hora de ingestão e conteúdo textual normalizado.
+- **Mecanismo de Ingestão e Montagem de Prompt Contextual:**
+  - Implementação de `ConhecimentoService` (`br.com.minerva.iabertoti.service.ConhecimentoService`):
+    - Ingestão de arquivos (`MultipartFile`) aceitando extensões `.txt` e `.md`, com validação de tipo, decodificação em UTF-8 e sanitização de quebras de linha (`carregarDocumento`).
+    - Ingestão direta de conteúdo em texto para testes ou automações (`carregarTexto`).
+    - Gerenciamento de estado em memória do documento ativo (`possuiDocumentoCarregado`, `obterDocumentoAtual`, `limparDocumento`).
+    - Estruturação do prompt contextual (RAG simples) com `PromptTemplate`, `SystemMessage` e `UserMessage`, orientando a LLM a atuar estritamente baseada no documento carregado e instruindo o modelo a admitir explicitamente quando a informação não constar no texto.
+
+#### 3. Conexão do Spring AI com os 5 Padrões de Projeto GoF e Interface Web (`6ade885`)
+- **Padrão Strategy (`br.com.minerva.iabertoti.strategy`):**
+  - Criação da classe `SpringAiKnowledgeStrategy` implementando `EstrategiaResposta` com anotações `@Component("springAiKnowledgeStrategy")` e `@Primary`. Injeta `ChatClient` e `ConhecimentoService` para inferência real com contexto RAG e tratamento de exceções com fallback amigável caso o daemon do Ollama esteja offline.
+  - Refatoração de `EcoStrategy` para atuar como mock determinístico em desenvolvimento e testes rápidos sem necessidade de GPU/LLM.
+  - Suporte à alternância dinâmica da estratégia ativa em tempo de execução via `ChatService`.
+- **Padrão Command (`br.com.minerva.iabertoti.command`):**
+  - Desacoplamento entre `ChatController` e as operações de negócio por meio de comandos executáveis:
+    - `CarregarDocumentoCommand`: orquestra a validação e ingestão de documentos.
+    - `LimparDocumentoCommand`: esvazia a base de conhecimento e registra aviso na sessão.
+    - `AlternarEstrategiaCommand`: permite alternar em runtime entre `SpringAiKnowledgeStrategy` e `EcoStrategy`.
+  - Atualização do `ChatController` para despachar ações exclusivamente instanciando e executando instâncias de `Comando`.
+- **Padrão State (`br.com.minerva.iabertoti.state`):**
+  - Modelagem do ciclo de vida da sessão (`EstadoSessao`): `AguardandoPerguntaState` $\rightarrow$ `ProcessandoState` $\rightarrow$ `RespondidoState`.
+  - Refatoração de `ProcessandoState` para encapsular a transição segura com `finalizarResposta(...)`, prevenindo condições de corrida e bloqueando novas perguntas simultâneas enquanto a IA responde.
+  - Atualização de `SessaoChat` para gerenciar histórico de mensagens, documento ativo e máquina de estados.
+- **Padrão Observer (`br.com.minerva.iabertoti.observer`):**
+  - Criação do `MetricasObservador` integrando `ChatObservador`, coletando telemetria em tempo real (total de respostas geradas, total de caracteres processados e métricas acumuladas da sessão), acionado a cada conclusão de inferência junto com `LogObservador`.
+- **Padrão Composite na Camada de Visão (Thymeleaf UI):**
+  - Composição hierárquica da interface web através de fragmentos:
+    - Raiz: `src/main/resources/templates/chat.html` com layout responsivo, badges dinâmicos de State e feedback visual.
+    - Galhos Compostos: `src/main/resources/templates/fragments/painel-conhecimento.html` (com formulário de upload de arquivos, card de status do documento ativo, seletor dinâmico de Strategy e painel de telemetria de métricas do Observer) e `lista-mensagens.html`.
+    - Folha Individual: `src/main/resources/templates/fragments/mensagem.html`.
+
+#### 4. Suíte de Testes Automatizados (`1d07b5e`, `6ade885`)
+- Implementação de **22 testes unitários** com JUnit 5 cobrindo 100% dos fluxos e regras:
+  - `ConhecimentoServiceTest`: ingestão com sucesso, rejeição de formatos não suportados, limpeza da base e montagem dos prompts de sistema e usuário.
+  - `SpringAiKnowledgeStrategyTest`: verificação de inferência com mock do `ChatClient` do Spring AI e resiliência de fallback.
+  - `CommandTest`: validação isolada dos 4 comandos do sistema (`EnviarPerguntaCommand`, `CarregarDocumentoCommand`, `LimparDocumentoCommand`, `AlternarEstrategiaCommand`).
+  - `ChatServiceTest`: ciclo completo de envio de mensagens, troca de estratégias e notificação de observadores.
+  - `SessaoChatTest`: transições de estado e proteção contra envios concorrentes em processamento.
+  - `IabertotiApplicationTests`: validação de carregamento do contexto Spring Boot e beans de IA.
+
+#### 5. Documentação Acadêmica, Diagramas UML (PlantUML e Mermaid) e Roteiro de Demonstração (`2521d33`)
+- **Diagramas UML Formais (PlantUML):**
+  - Criação de 6 especificações UML completas no diretório `docs/uml/`:
+    - `arquitetura-geral.puml`: visão unificada demonstrando a arquitetura em camadas e os 5 design patterns conectados ao Spring AI.
+    - `state.puml`: diagrama de classes e transição de estados da sessão de chat.
+    - `command.puml`: diagrama do padrão Command e desacoplamento do controller.
+    - `strategy.puml`: diagrama das estratégias de resposta e integração com Ollama.
+    - `observer.puml`: diagrama do mecanismo de observadores e telemetria.
+    - `composite.puml`: diagrama estrutural da árvore de templates Thymeleaf.
+- **Renderização Mermaid:**
+  - Criação do `docs/uml/README.md` contendo todos os diagramas transpostos para Mermaid com renderização visual nativa no GitHub.
+- **Reformulação do `README.md` Principal:**
+  - Justificativa conceitual do projeto como *Knowledge Assistant* corporativo.
+  - Tabela comparativa e defensável dos 5 Design Patterns GoF implementados.
+  - Exemplos explicativos com trechos de código de cada padrão.
+  - Passo a passo de instalação com Ollama, execução Maven e roteiro prático de testes e validação.
+
+#### 6. Histórico de Commits no Projeto IAbertoti
+
+| Data | Hash | Mensagem | Branch(es) | Principais Arquivos / Escopo |
+| :--- | :--- | :--- | :--- | :--- |
+| 2026-11-15 | `1d07b5e` | `feat(knowledge): configurar Spring AI com Ollama e implementar servico de base de conhecimento` | `experimental`, `origin/experimental` | `pom.xml`, `SpringAiConfig.java`, `DocumentoConhecimento.java`, `ConhecimentoService.java`, `application.properties`, `ConhecimentoServiceTest.java`, `IabertotiApplicationTests.java` |
+| 2026-11-15 | `6ade885` | `feat(patterns): conectar Spring AI aos 5 design patterns e interface Thymeleaf (Etapa 3)` | `experimental`, `origin/experimental` | `SpringAiKnowledgeStrategy.java`, `CarregarDocumentoCommand.java`, `LimparDocumentoCommand.java`, `AlternarEstrategiaCommand.java`, `MetricasObservador.java`, `ProcessandoState.java`, `ChatService.java`, `ChatController.java`, `chat.html`, `painel-conhecimento.html`, testes unitários |
+| 2026-11-15 | `2521d33` | `docs: adicionar diagramas UML (PlantUML/Mermaid) e documentacao final no README` | `experimental`, `origin/experimental` | `README.md`, `docs/uml/README.md`, `arquitetura-geral.puml`, `state.puml`, `command.puml`, `strategy.puml`, `observer.puml`, `composite.puml` |
 
 
 ---
